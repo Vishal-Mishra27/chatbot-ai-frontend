@@ -25,15 +25,18 @@ export default function ChatUI() {
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: trimmed,
-          userId,
-          token: "",
-        }),
-      });
+      const res = await fetch(
+        "https://chatbot-ai-backend-t7xb.onrender.com/chat",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: trimmed,
+            userId,
+            token: "",
+          }),
+        },
+      );
 
       const data = await res.json();
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply || data.error }]);
