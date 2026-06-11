@@ -9,15 +9,8 @@ const BASE_URL = "https://root.roombookkro.com/api";
 export default function ChatUI() {
   const [userId, setUserId] = useState("");
   const [userIdInput, setUserIdInput] = useState("");
-
-  // Read userId from URL params (?userId=15)
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const paramUserId = params.get("userId");
-    if (paramUserId) setUserId(paramUserId);
-  }, []);
   const [messages, setMessages] = useState([
-    { role: "assistant", content: "Hi! I'm your AI assistant. How can I help you?" },
+    { role: "assistant", content: "Namaste! 🙏 Main aapka hotel booking assistant hoon. Kaise madad kar sakta hoon?" },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -27,6 +20,12 @@ export default function ChatUI() {
   const [bookingStep, setBookingStep] = useState(null);
   const [paymentSession, setPaymentSession] = useState(null);
   const bottomRef = useRef(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paramUserId = params.get("userId");
+    if (paramUserId) setUserId(paramUserId);
+  }, []);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -49,10 +48,10 @@ export default function ChatUI() {
     const keywords = [
       "hotel dhundho", "hotel dikhao", "rooms dikhao", "nearby hotel", "hotels near",
       "search hotel", "koi hotel", "hotel chahiye", "available rooms", "paas mein",
-      "najdik", "nazdeek", "aas paas",
-      "nearest hotel", "find hotel", "show hotel", "hotels near me", "hotel near me",
-      "nearby hotels", "available hotel", "show me hotel", "find me hotel", "look for hotel",
-      "search for hotel", "any hotel", "hotel available",
+      "najdik", "nazdeek", "aas paas", "nearest hotel", "find hotel", "show hotel",
+      "hotels near me", "hotel near me", "nearby hotels", "available hotel",
+      "show me hotel", "find me hotel", "look for hotel", "search for hotel",
+      "any hotel", "hotel available",
     ];
     return keywords.some((k) => text.toLowerCase().includes(k));
   };
@@ -61,15 +60,8 @@ export default function ChatUI() {
     new Promise((resolve) => {
       if (!navigator.geolocation) { resolve(null); return; }
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setLocation(loc);
-          resolve(loc);
-        },
-        (err) => {
-          console.warn("Geolocation error:", err.code, err.message);
-          resolve(null);
-        },
+        (pos) => { const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }; setLocation(loc); resolve(loc); },
+        (err) => { console.warn("Geolocation error:", err.code, err.message); resolve(null); },
         { timeout: 10000, enableHighAccuracy: false, maximumAge: 60000 }
       );
     });
@@ -100,10 +92,7 @@ export default function ChatUI() {
     if (loc?.lat && loc?.lng) {
       await handleSearch(pendingKeyword, loc);
     } else {
-      addAssistantMsg(
-        "Location access nahi mila. App/browser settings mein location permission allow karein aur dobara try karein.",
-        { locationBtn: true, pendingKeyword }
-      );
+      addAssistantMsg("Location access nahi mila. App/browser settings mein location permission allow karein.", { locationBtn: true, pendingKeyword });
     }
   };
 
@@ -118,33 +107,28 @@ export default function ChatUI() {
     setBookingState(updatedState);
     setBookingStep("payment_method");
     addAssistantMsg(
-      `\u2705 Details mil gayi!\n\ud83c\udfe8 ${updatedState.hotelName} \u2014 ${updatedState.roomType}\n\ud83d\udcc5 Check-in: ${formData.checkInDate.split("T")[0]}\n\ud83d\udcc5 Check-out: ${formData.checkOutDate.split("T")[0]}\n\ud83d\udc64 Guest: ${formData.bookingFor}\n\ud83d\udecc Rooms: ${formData.nor} | Guests: ${formData.nog}\n\ud83c\udfe8 ${formData.numberOfNights} night(s) \u00d7 \u20b9${bookingState.pricePerNight} = \u20b9${formData.finalAmount}\n\nPayment method chunein:`,
+      `✅ Details mil gayi!\n🏨 ${updatedState.hotelName} — ${updatedState.roomType}\n📅 Check-in: ${formData.checkInDate.split("T")[0]}\n📅 Check-out: ${formData.checkOutDate.split("T")[0]}\n👤 Guest: ${formData.bookingFor}\n🛏️ Rooms: ${formData.nor} | Guests: ${formData.nog}\n🌙 ${formData.numberOfNights} night(s) × ₹${bookingState.pricePerNight} = ₹${formData.finalAmount}\n\nPayment method chunein:`,
       { bookingStep: "payment_method" }
     );
   };
 
   const handleFormCancel = () => {
-    setBookingStep(null);
-    setBookingState(null);
-    setSelectedRoom(null);
+    setBookingStep(null); setBookingState(null); setSelectedRoom(null);
     addAssistantMsg("Booking cancel kar di gayi. Koi aur madad chahiye?");
   };
 
   const handlePayAtHotel = async () => {
-    setBookingStep(null);
-    setLoading(true);
+    setBookingStep(null); setLoading(true);
     try {
       const res = await fetch(`${BASE_URL}/placeorder`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookingState }),
       });
       const data = await res.json();
       if (data.success) {
         setBookingStep("done");
-        addAssistantMsg(`\u2705 Booking Confirmed!\n\ud83c\udfe8 Hotel: ${bookingState.hotelName}\n\ud83d\udecf\ufe0f Room: ${bookingState.roomType}\n\ud83d\udc64 Guest: ${bookingState.bookingFor}\n\ud83d\udcc5 Check-in: ${bookingState.checkInDate.split("T")[0]}\n\ud83d\udcc5 Check-out: ${bookingState.checkOutDate.split("T")[0]}\n\ud83d\udcb0 Amount: \u20b9${bookingState.finalAmount}\n\ud83d\udcb3 Payment: Pay at Hotel\n\ud83d\udd16 Order ID: ${data.orderId}`);
-        setBookingState(null);
-        setSelectedRoom(null);
+        addAssistantMsg(`✅ Booking Confirmed!\n🏨 Hotel: ${bookingState.hotelName}\n🛏️ Room: ${bookingState.roomType}\n👤 Guest: ${bookingState.bookingFor}\n📅 Check-in: ${bookingState.checkInDate.split("T")[0]}\n📅 Check-out: ${bookingState.checkOutDate.split("T")[0]}\n💰 Amount: ₹${bookingState.finalAmount}\n💳 Payment: Pay at Hotel\n🔖 Order ID: ${data.orderId}`);
+        setBookingState(null); setSelectedRoom(null);
       } else {
         addAssistantMsg(data.error || "Order place karne mein error aaya.");
         setBookingStep("payment_method");
@@ -152,18 +136,14 @@ export default function ChatUI() {
     } catch {
       addAssistantMsg("Order place karne mein error aaya. Dobara try karein.");
       setBookingStep("payment_method");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleOnlinePayment = async () => {
-    setBookingStep(null);
-    setLoading(true);
+    setBookingStep(null); setLoading(true);
     try {
       const res = await fetch(`${BASE_URL}/user/add_wallet`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, amount: bookingState.finalAmount, token: "" }),
       });
       const data = await res.json();
@@ -171,40 +151,29 @@ export default function ChatUI() {
         setPaymentSession({ payment_link: data.payment_link, order_id: data.order_id });
         setBookingStep("online_payment");
         setLoading(false);
-
         const cashfree = new window.Cashfree({ mode: "sandbox" });
-        const result = await cashfree.checkout({
-          paymentSessionId: data.payment_session_id,
-          redirectTarget: "_modal",
-        });
-
-        console.log("Cashfree result:", result);
+        const result = await cashfree.checkout({ paymentSessionId: data.payment_session_id, redirectTarget: "_modal" });
         const paymentStatus = result?.paymentDetails?.paymentStatus;
-
         if (paymentStatus === "SUCCESS") {
-          setLoading(true);
-          setBookingStep(null);
+          setLoading(true); setBookingStep(null);
           const verifyRes = await fetch(`${BASE_URL2}/booking/verify-and-place`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+            method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ bookingState, cashfreeOrderId: data.order_id }),
           });
           const verifyData = await verifyRes.json();
           if (verifyData.status === "PAID" && verifyData.success) {
             setBookingStep("done");
-            addAssistantMsg(`\u2705 Booking Confirmed!\n\ud83c\udfe8 Hotel: ${bookingState.hotelName}\n\ud83d\udecf\ufe0f Room: ${bookingState.roomType}\n\ud83d\udc64 Guest: ${bookingState.bookingFor}\n\ud83d\udcc5 Check-in: ${bookingState.checkInDate.split("T")[0]}\n\ud83d\udcc5 Check-out: ${bookingState.checkOutDate.split("T")[0]}\n\ud83d\udcb0 Amount: \u20b9${bookingState.finalAmount}\n\ud83d\udcb3 Payment: Online Paid\n\ud83d\udd16 Order ID: ${verifyData.orderId}`);
-            setBookingState(null);
-            setSelectedRoom(null);
-            setPaymentSession(null);
+            addAssistantMsg(`✅ Booking Confirmed!\n🏨 Hotel: ${bookingState.hotelName}\n🛏️ Room: ${bookingState.roomType}\n👤 Guest: ${bookingState.bookingFor}\n📅 Check-in: ${bookingState.checkInDate.split("T")[0]}\n📅 Check-out: ${bookingState.checkOutDate.split("T")[0]}\n💰 Amount: ₹${bookingState.finalAmount}\n💳 Payment: Online Paid\n🔖 Order ID: ${verifyData.orderId}`);
+            setBookingState(null); setSelectedRoom(null); setPaymentSession(null);
           } else {
-            addAssistantMsg(verifyData.error || "Booking place karne mein error aaya. Support se contact karein.");
+            addAssistantMsg(verifyData.error || "Booking place karne mein error aaya.");
             setBookingStep("payment_method");
           }
         } else if (paymentStatus === "FAILED") {
-          addAssistantMsg("\u274c Payment failed ho gaya. Dobara try karein?", { bookingStep: "payment_method" });
+          addAssistantMsg("❌ Payment failed ho gaya. Dobara try karein?", { bookingStep: "payment_method" });
           setBookingStep("payment_method");
         } else {
-          addAssistantMsg("Payment abhi complete nahi hua. Payment karne ke baad dobara try karein.", { bookingStep: "online_payment", paymentLink: data.payment_link });
+          addAssistantMsg("Payment abhi complete nahi hua. Dobara try karein.", { bookingStep: "online_payment", paymentLink: data.payment_link });
           setBookingStep("online_payment");
         }
       } else {
@@ -214,50 +183,35 @@ export default function ChatUI() {
     } catch {
       addAssistantMsg("Payment session banana mein error aaya. Dobara try karein.");
       setBookingStep("payment_method");
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handlePaymentDone = async () => {
-    setBookingStep(null);
-    setLoading(true);
+    setBookingStep(null); setLoading(true);
     try {
       const res = await fetch(`${BASE_URL2}/booking/verify-and-place`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookingState, cashfreeOrderId: paymentSession.order_id }),
       });
       const data = await res.json();
       if (data.status === "PAID" && data.success) {
         setBookingStep("done");
-        addAssistantMsg(`\u2705 Booking Confirmed!\n\ud83c\udfe8 Hotel: ${bookingState.hotelName}\n\ud83d\udecf\ufe0f Room: ${bookingState.roomType}\n\ud83d\udc64 Guest: ${bookingState.bookingFor}\n\ud83d\udcc5 Check-in: ${bookingState.checkInDate.split("T")[0]}\n\ud83d\udcc5 Check-out: ${bookingState.checkOutDate.split("T")[0]}\n\ud83d\udcb0 Amount: \u20b9${bookingState.finalAmount}\n\ud83d\udcb3 Payment: Online Paid\n\ud83d\udd16 Order ID: ${data.orderId}`);
-        setBookingState(null);
-        setSelectedRoom(null);
-        setPaymentSession(null);
+        addAssistantMsg(`✅ Booking Confirmed!\n🏨 Hotel: ${bookingState.hotelName}\n🛏️ Room: ${bookingState.roomType}\n👤 Guest: ${bookingState.bookingFor}\n📅 Check-in: ${bookingState.checkInDate.split("T")[0]}\n📅 Check-out: ${bookingState.checkOutDate.split("T")[0]}\n💰 Amount: ₹${bookingState.finalAmount}\n💳 Payment: Online Paid\n🔖 Order ID: ${data.orderId}`);
+        setBookingState(null); setSelectedRoom(null); setPaymentSession(null);
       } else if (data.status === "EXPIRED") {
-        addAssistantMsg(data.message);
-        await handleOnlinePayment();
+        addAssistantMsg(data.message); await handleOnlinePayment();
       } else if (data.status === "FAILED") {
-        addAssistantMsg(data.message);
-        setBookingStep("payment_method");
+        addAssistantMsg(data.message); setBookingStep("payment_method");
       } else {
-        addAssistantMsg(data.message || "Payment abhi complete nahi hua.");
-        setBookingStep("online_payment");
+        addAssistantMsg(data.message || "Payment abhi complete nahi hua."); setBookingStep("online_payment");
       }
     } catch {
-      addAssistantMsg("Payment verify karne mein error aaya.");
-      setBookingStep("online_payment");
-    } finally {
-      setLoading(false);
-    }
+      addAssistantMsg("Payment verify karne mein error aaya."); setBookingStep("online_payment");
+    } finally { setLoading(false); }
   };
 
   const handleCancelPayment = () => {
-    setBookingStep(null);
-    setBookingState(null);
-    setSelectedRoom(null);
-    setPaymentSession(null);
+    setBookingStep(null); setBookingState(null); setSelectedRoom(null); setPaymentSession(null);
     addAssistantMsg("Booking cancel kar di gayi. Koi aur madad chahiye?");
   };
 
@@ -265,107 +219,156 @@ export default function ChatUI() {
     const trimmed = input.trim();
     if (!trimmed || loading) return;
     if (bookingStep === "form" || bookingStep === "payment_method" || bookingStep === "online_payment") return;
-
     setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
     setInput("");
-
     if (isSearchIntent(trimmed)) { await handleSearch(trimmed); return; }
-
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL2}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const res = await fetch(`${BASE_URL}/chat`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: trimmed, userId, token: "" }),
       });
       const data = await res.json();
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply || data.error }]);
     } catch {
       setMessages((prev) => [...prev, { role: "assistant", content: "Error: Could not reach server." }]);
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleKey = (e) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
+  // ── User ID Screen ──────────────────────────────────────────────
   if (!userId) {
     return (
-      <div className="chat-container">
-        <div className="chat-header">🤖 AI Chatbot</div>
-        <div className="userid-screen">
-          <p>Apna User ID enter karein</p>
-          <input type="text" value={userIdInput} onChange={(e) => setUserIdInput(e.target.value)}
+      <div className="min-h-screen min-h-dvh bg-gradient-to-br from-emerald-50 to-white flex items-center justify-center p-4">
+        <div className="w-full max-w-sm bg-white rounded-3xl shadow-xl p-8 flex flex-col items-center gap-6 border border-gray-100">
+          <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center text-3xl shadow-lg">🏨</div>
+          <div className="text-center">
+            <h1 className="text-xl font-bold text-gray-800">Hotel Booking Assistant</h1>
+            <p className="text-sm text-gray-400 mt-1">Apna User ID enter karein</p>
+          </div>
+          <input
+            type="text" value={userIdInput}
+            onChange={(e) => setUserIdInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && userIdInput.trim() && setUserId(userIdInput.trim())}
-            placeholder="Enter User ID..." />
-          <button onClick={() => userIdInput.trim() && setUserId(userIdInput.trim())}>Start Chat</button>
+            placeholder="User ID..."
+            className="w-full border-2 border-gray-100 focus:border-emerald-400 rounded-2xl px-4 py-3 text-sm outline-none transition text-gray-800 bg-gray-50"
+          />
+          <button
+            onClick={() => userIdInput.trim() && setUserId(userIdInput.trim())}
+            className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-2xl transition-colors text-sm shadow-md"
+          >
+            Start Chat →
+          </button>
         </div>
       </div>
     );
   }
 
+  // ── Main Chat ───────────────────────────────────────────────────
   return (
-    <div className="chat-container">
-      <div className="chat-header">🤖 AI Chatbot <span className="userid-badge">ID: {userId}</span></div>
+    <div className="bg-gray-50 flex items-start justify-center fixed inset-0">
+      <div className="w-full max-w-md h-[96%] sm:h-[680px] sm:rounded-3xl sm:shadow-2xl bg-white flex flex-col overflow-hidden border border-gray-100 sm:relative">
 
-      <div className="chat-messages">
-        {messages.map((msg, i) => (
-          <div key={i} className={`message ${msg.role}`}>
-            {msg.hotels ? (
-              <><span>{msg.content}</span><HotelCards hotels={msg.hotels} onSelectRoom={handleRoomSelect} /></>
-            ) : msg.locationBtn ? (
-              <><span>{msg.content}</span>
-                <button className="location-btn" onClick={() => handleGetLocation(msg.pendingKeyword)}>📍 Get My Location</button>
-              </>
-            ) : msg.bookingStep ? (
-              <><span>{msg.content}</span>
-                <BookingFlow
-                  step={msg.bookingStep}
-                  paymentLink={msg.paymentLink}
-                  onPayAtHotel={i === messages.length - 1 ? handlePayAtHotel : null}
-                  onOnlinePayment={i === messages.length - 1 ? handleOnlinePayment : null}
-                  onPaymentDone={i === messages.length - 1 ? handlePaymentDone : null}
-                  onCancel={i === messages.length - 1 ? handleCancelPayment : null}
-                />
-              </>
-            ) : (
-              <span>{msg.content}</span>
-            )}
+        {/* Header */}
+        <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-5 py-4 flex items-center gap-3 shrink-0">
+          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center text-xl">🏨</div>
+          <div className="flex-1">
+            <div className="text-white font-bold text-sm">Hotel Booking Assistant</div>
+            <div className="text-emerald-100 text-xs">Online · Ready to help</div>
           </div>
-        ))}
+          <div className="bg-white/20 text-white text-xs font-medium px-3 py-1 rounded-full">ID: {userId}</div>
+        </div>
 
-        {bookingStep === "form" && selectedRoom && (
-          <div className="message assistant">
-            <BookingForm
-              hotel={selectedRoom.hotel}
-              room={selectedRoom.room}
-              onSubmit={handleFormSubmit}
-              onCancel={handleFormCancel}
-            />
-          </div>
-        )}
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 bg-gray-50">
+          {messages.map((msg, i) => (
+            <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+              {msg.role === "assistant" && (
+                <div className="w-7 h-7 bg-emerald-500 rounded-xl flex items-center justify-center text-sm mr-2 mt-0.5 shrink-0">🏨</div>
+              )}
+              <div className={`max-w-[80%] ${msg.role === "user"
+                ? "bg-emerald-500 text-white rounded-2xl rounded-tr-sm px-4 py-2.5"
+                : "bg-white text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm border border-gray-100"
+              }`}>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                {msg.hotels && <HotelCards hotels={msg.hotels} onSelectRoom={handleRoomSelect} />}
+                {msg.locationBtn && (
+                  <button onClick={() => handleGetLocation(msg.pendingKeyword)}
+                    className="mt-2 flex items-center gap-2 bg-amber-400 hover:bg-amber-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors">
+                    📍 Get My Location
+                  </button>
+                )}
+                {msg.bookingStep && (
+                  <BookingFlow
+                    step={msg.bookingStep}
+                    paymentLink={msg.paymentLink}
+                    onPayAtHotel={i === messages.length - 1 ? handlePayAtHotel : null}
+                    onOnlinePayment={i === messages.length - 1 ? handleOnlinePayment : null}
+                    onPaymentDone={i === messages.length - 1 ? handlePaymentDone : null}
+                    onCancel={i === messages.length - 1 ? handleCancelPayment : null}
+                  />
+                )}
+              </div>
+            </div>
+          ))}
 
-        {loading && (
-          <div className="message assistant">
-            <span className="typing">● ● ●</span>
-          </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
+          {/* Booking Form */}
+          {bookingStep === "form" && selectedRoom && (
+            <div className="flex justify-start">
+              <div className="w-7 h-7 bg-emerald-500 rounded-xl flex items-center justify-center text-sm mr-2 mt-0.5 shrink-0">🏨</div>
+              <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-gray-100 w-full max-w-[85%]">
+                <BookingForm hotel={selectedRoom.hotel} room={selectedRoom.room} onSubmit={handleFormSubmit} onCancel={handleFormCancel} />
+              </div>
+            </div>
+          )}
 
-      <div className="chat-input">
-        <textarea rows={1} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKey}
-          placeholder={
-            bookingStep === "form" ? "Form mein details bharein..." :
-            bookingStep === "payment_method" ? "Upar se payment method chunein..." :
-            bookingStep === "online_payment" ? "Payment ke baad button dabayein..." :
-            "Type a message..."
-          }
-          disabled={bookingStep === "form" || bookingStep === "payment_method" || bookingStep === "online_payment"}
-        />
-        <button onClick={sendMessage} disabled={loading || !!bookingStep}>Send</button>
+          {/* Typing Indicator */}
+          {loading && (
+            <div className="flex justify-start">
+              <div className="w-7 h-7 bg-emerald-500 rounded-xl flex items-center justify-center text-sm mr-2 shrink-0">🏨</div>
+              <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-gray-100">
+                <div className="flex gap-1 items-center h-4">
+                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:0ms]"></span>
+                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:150ms]"></span>
+                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:300ms]"></span>
+                </div>
+              </div>
+            </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Input */}
+        <div className="px-4 py-3 bg-white border-t border-gray-100 shrink-0">
+          {bookingStep && bookingStep !== "done" && bookingStep !== "form" ? (
+            <div className="text-center text-xs text-gray-400 py-2">
+              {bookingStep === "payment_method" ? "⬆️ Payment method chunein" : "⬆️ Upar se action karein"}
+            </div>
+          ) : (
+            <div className="flex gap-2 items-end">
+              <textarea
+                rows={1} value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKey}
+                placeholder="Message likhein..."
+                disabled={bookingStep === "form"}
+                className="flex-1 resize-none bg-gray-50 border border-gray-200 focus:border-emerald-400 rounded-2xl px-4 py-2.5 text-sm outline-none transition text-gray-800 max-h-24 disabled:opacity-50"
+              />
+              <button
+                onClick={sendMessage}
+                disabled={loading || !!bookingStep}
+                className="w-10 h-10 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white rounded-xl flex items-center justify-center transition-colors shrink-0"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 rotate-0">
+                  <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
