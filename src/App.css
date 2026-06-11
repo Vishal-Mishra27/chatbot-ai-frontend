@@ -181,3 +181,365 @@ body {
   opacity: 0.8;
   margin-left: 8px;
 }
+
+.hotel-cards-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.hotel-card {
+  background: #1e1e2e;
+  border: 1px solid #333;
+  border-radius: 10px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.hotel-card-img {
+  width: 100%;
+  height: 120px;
+  object-fit: cover;
+}
+
+.hotel-card-body {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hotel-card-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.hotel-card-meta {
+  font-size: 0.75rem;
+  color: #aaa;
+}
+
+.hotel-card-rating {
+  font-size: 0.78rem;
+  color: #facc15;
+}
+
+.hotel-rooms {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.room-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #2a2a3e;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.room-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.room-type {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #e5e5e5;
+}
+
+.room-price {
+  font-size: 0.78rem;
+  color: #4ade80;
+}
+
+.room-amenities {
+  font-size: 0.7rem;
+  color: #888;
+}
+
+.book-btn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.book-btn:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.book-btn:disabled {
+  background: #555;
+  cursor: not-allowed;
+}
+
+.no-hotels {
+  font-size: 0.85rem;
+  color: #aaa;
+  margin-top: 6px;
+}
+
+.message.assistant {
+  max-width: 95%;
+}
+
+.booking-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.pay-hotel-btn {
+  background: #16a34a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.pay-hotel-btn:hover {
+  background: #15803d;
+}
+
+.pay-online-btn {
+  background: #7c3aed;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.pay-online-btn:hover {
+  background: #6d28d9;
+}
+
+.pay-now-btn {
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.pay-now-btn:hover {
+  background: #1d4ed8;
+}
+
+.payment-done-btn {
+  background: #16a34a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.payment-done-btn:hover {
+  background: #15803d;
+}
+
+.cancel-btn {
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.cancel-btn:hover {
+  background: #b91c1c;
+}
+
+.location-btn {
+  margin-top: 8px;
+  background: #f59e0b;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: block;
+}
+
+.location-btn:hover {
+  background: #d97706;
+}
+
+.booking-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  padding: 4px 0;
+}
+
+.bf-hotel-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.bf-hotel-name {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.bf-room-type {
+  font-size: 0.78rem;
+  color: #4ade80;
+}
+
+.bf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bf-field label {
+  font-size: 0.75rem;
+  color: #aaa;
+}
+
+.bf-field input[type="text"],
+.bf-field input[type="date"],
+.bf-field input[type="number"] {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: white;
+  padding: 7px 10px;
+  font-size: 0.82rem;
+  outline: none;
+  font-family: inherit;
+  width: 100%;
+}
+
+.bf-field input:focus {
+  border-color: #2563eb;
+}
+
+.bf-row {
+  display: flex;
+  gap: 10px;
+}
+
+.bf-row .bf-field {
+  flex: 1;
+}
+
+.bf-children-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.bf-children-row label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #e5e5e5;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.bf-children-row input[type="number"] {
+  width: 80px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: white;
+  padding: 7px 10px;
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.bf-amount {
+  font-size: 0.8rem;
+  color: #facc15;
+  background: #2a2a1a;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+.bf-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.bf-cancel {
+  flex: 1;
+  background: #3a3a3a;
+  color: #ccc;
+  border: none;
+  border-radius: 8px;
+  padding: 9px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.bf-cancel:hover {
+  background: #444;
+}
+
+.bf-confirm {
+  flex: 2;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 9px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.bf-confirm:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.bf-confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
