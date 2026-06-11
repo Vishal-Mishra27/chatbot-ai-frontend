@@ -273,7 +273,7 @@ export default function ChatUI() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/chat`, {
+      const res = await fetch(`${BASE_URL2}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: trimmed, userId, token: "" }),
