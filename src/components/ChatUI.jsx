@@ -3,7 +3,7 @@ import HotelCards from "./HotelCards";
 import BookingFlow from "./BookingFlow";
 import BookingForm from "./BookingForm";
 
-const BASE_URL2 = "http://localhost:5000";
+const BASE_URL2 = "https://chatbot-ai-backend-t7xb.onrender.com";
 const BASE_URL = "https://root.roombookkro.com/api";
 
 export default function ChatUI() {
@@ -163,11 +163,17 @@ export default function ChatUI() {
           // Auto verify and place order
           setLoading(true);
           setBookingStep(null);
-          const verifyRes = await fetch(`http://localhost:5000/booking/verify-and-place`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ bookingState, cashfreeOrderId: data.order_id }),
-          });
+          const verifyRes = await fetch(
+            `https://chatbot-ai-backend-t7xb.onrender.com/booking/verify-and-place`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                bookingState,
+                cashfreeOrderId: data.order_id,
+              }),
+            },
+          );
           const verifyData = await verifyRes.json();
           if (verifyData.status === "PAID" && verifyData.success) {
             setBookingStep("done");
@@ -204,14 +210,17 @@ export default function ChatUI() {
    setLoading(true);
    console.log("Verifying payment for order_id:", paymentSession?.order_id);
    try {
-     const res = await fetch(`http://localhost:5000/booking/verify-and-place`, {
-       method: "POST",
-       headers: { "Content-Type": "application/json" },
-       body: JSON.stringify({
-         bookingState,
-         cashfreeOrderId: paymentSession.order_id,
-       }),
-     });
+     const res = await fetch(
+       `https://chatbot-ai-backend-t7xb.onrender.com/booking/verify-and-place`,
+       {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({
+           bookingState,
+           cashfreeOrderId: paymentSession.order_id,
+         }),
+       },
+     );
      const data = await res.json();
 
      if (data.status === "PAID" && data.success) {
