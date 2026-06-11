@@ -139,53 +139,177 @@ export default function ChatUI() {
     } finally { setLoading(false); }
   };
 
+  // const handleOnlinePayment = async () => {
+  //   setBookingStep(null); setLoading(true);
+  //   try {
+  //     const res = await fetch(`${BASE_URL}/user/add_wallet`, {
+  //       method: "POST", headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ userId, amount: bookingState.finalAmount, token: "" }),
+  //     });
+  //     const data = await res.json();
+  //     if (data.payment_session_id) {
+  //       setPaymentSession({ payment_link: data.payment_link, order_id: data.order_id });
+  //       setBookingStep("online_payment");
+  //       setLoading(false);
+  //       const cashfree = new window.Cashfree({ mode: "sandbox" });
+  //       const result = await cashfree.checkout({ paymentSessionId: data.payment_session_id, redirectTarget: "_modal" });
+  //       const paymentStatus = result?.paymentDetails?.paymentStatus;
+  //       if (paymentStatus === "SUCCESS") {
+  //         setLoading(true); setBookingStep(null);
+  //         const verifyRes = await fetch(`${BASE_URL2}/booking/verify-and-place`, {
+  //           method: "POST", headers: { "Content-Type": "application/json" },
+  //           body: JSON.stringify({ bookingState, cashfreeOrderId: data.order_id }),
+  //         });
+  //         const verifyData = await verifyRes.json();
+  //         if (verifyData.status === "PAID" && verifyData.success) {
+  //           setBookingStep("done");
+  //           addAssistantMsg(`✅ Booking Confirmed!\n🏨 Hotel: ${bookingState.hotelName}\n🛏️ Room: ${bookingState.roomType}\n👤 Guest: ${bookingState.bookingFor}\n📅 Check-in: ${bookingState.checkInDate.split("T")[0]}\n📅 Check-out: ${bookingState.checkOutDate.split("T")[0]}\n💰 Amount: ₹${bookingState.finalAmount}\n💳 Payment: Online Paid\n🔖 Order ID: ${verifyData.orderId}`);
+  //           setBookingState(null); setSelectedRoom(null); setPaymentSession(null);
+  //         } else {
+  //           addAssistantMsg(verifyData.error || "Booking place karne mein error aaya.");
+  //           setBookingStep("payment_method");
+  //         }
+  //       } else if (paymentStatus === "FAILED") {
+  //         addAssistantMsg("❌ Payment failed ho gaya. Dobara try karein?", { bookingStep: "payment_method" });
+  //         setBookingStep("payment_method");
+  //       } else {
+  //         addAssistantMsg("Payment abhi complete nahi hua. Dobara try karein.", { bookingStep: "online_payment", paymentLink: data.payment_link });
+  //         setBookingStep("online_payment");
+  //       }
+  //     } else {
+  //       addAssistantMsg(data.error || "Payment session banana mein error aaya.");
+  //       setBookingStep("payment_method");
+  //     }
+  //   } catch {
+  //     addAssistantMsg("Payment session banana mein error aaya. Dobara try karein.");
+  //     setBookingStep("payment_method");
+  //   } finally { setLoading(false); }
+  // };
+
   const handleOnlinePayment = async () => {
-    setBookingStep(null); setLoading(true);
+    setBookingStep(null);
+    setLoading(true);
     try {
       const res = await fetch(`${BASE_URL}/user/add_wallet`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, amount: bookingState.finalAmount, token: "" }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          amount: bookingState.finalAmount,
+          token: "",
+        }),
       });
       const data = await res.json();
+
       if (data.payment_session_id) {
-        setPaymentSession({ payment_link: data.payment_link, order_id: data.order_id });
-        setBookingStep("online_payment");
+        setPaymentSession({
+          payment_link: data.payment_link,
+          order_id: data.order_id,
+        });
         setLoading(false);
+
         const cashfree = new window.Cashfree({ mode: "sandbox" });
-        const result = await cashfree.checkout({ paymentSessionId: data.payment_session_id, redirectTarget: "_modal" });
-        const paymentStatus = result?.paymentDetails?.paymentStatus;
-        if (paymentStatus === "SUCCESS") {
-          setLoading(true); setBookingStep(null);
-          const verifyRes = await fetch(`${BASE_URL2}/booking/verify-and-place`, {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ bookingState, cashfreeOrderId: data.order_id }),
-          });
+
+        // Cashfree checkout — await karo jab tak modal band na ho
+        const result = await cashfree.checkout({
+          paymentSessionId: data.payment_session_id,
+          redirectTarget: "_modal",
+        });
+
+        // ✅ Modal band hote hi — chahe success/fail/close — verify call karo
+        setBookingStep(null);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "🔄 Payment verify ho rahi hai, please wait...",
+            isVerifying: true,
+          },
+        ]);
+        setLoading(true);
+
+        try {
+          const verifyRes = await fetch(
+            `${BASE_URL2}/booking/verify-and-place`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                bookingState,
+                cashfreeOrderId: data.order_id,
+              }),
+            },
+          );
           const verifyData = await verifyRes.json();
+
           if (verifyData.status === "PAID" && verifyData.success) {
+            // ✅ Pehle "booking place ho rahi hai" dikhao
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content:
+                  "📋 Payment confirmed! Booking place ki ja rahi hai...",
+              },
+            ]);
+
+            // Thoda delay taaki user message padh sake
+            await new Promise((r) => setTimeout(r, 800));
+
             setBookingStep("done");
-            addAssistantMsg(`✅ Booking Confirmed!\n🏨 Hotel: ${bookingState.hotelName}\n🛏️ Room: ${bookingState.roomType}\n👤 Guest: ${bookingState.bookingFor}\n📅 Check-in: ${bookingState.checkInDate.split("T")[0]}\n📅 Check-out: ${bookingState.checkOutDate.split("T")[0]}\n💰 Amount: ₹${bookingState.finalAmount}\n💳 Payment: Online Paid\n🔖 Order ID: ${verifyData.orderId}`);
-            setBookingState(null); setSelectedRoom(null); setPaymentSession(null);
-          } else {
-            addAssistantMsg(verifyData.error || "Booking place karne mein error aaya.");
+            addAssistantMsg(
+              `✅ Booking Confirmed!\n🏨 Hotel: ${bookingState.hotelName}\n🛏️ Room: ${bookingState.roomType}\n👤 Guest: ${bookingState.bookingFor}\n📅 Check-in: ${bookingState.checkInDate.split("T")[0]}\n📅 Check-out: ${bookingState.checkOutDate.split("T")[0]}\n💰 Amount: ₹${bookingState.finalAmount}\n💳 Payment: Online Paid\n🔖 Order ID: ${verifyData.orderId}`,
+            );
+            setBookingState(null);
+            setSelectedRoom(null);
+            setPaymentSession(null);
+          } else if (verifyData.status === "EXPIRED") {
+            addAssistantMsg(
+              verifyData.message || "Payment session expire ho gaya.",
+            );
             setBookingStep("payment_method");
+          } else if (verifyData.status === "FAILED") {
+            addAssistantMsg("❌ Payment fail ho gayi. Dobara try karein?");
+            setBookingStep("payment_method");
+          } else {
+            // PENDING ya kuch aur
+            addAssistantMsg(
+              verifyData.message ||
+                "Payment abhi complete nahi hua. Thodi der baad verify karein.",
+              { bookingStep: "online_payment", paymentLink: data.payment_link },
+            );
+            setPaymentSession({
+              payment_link: data.payment_link,
+              order_id: data.order_id,
+            });
+            setBookingStep("online_payment");
           }
-        } else if (paymentStatus === "FAILED") {
-          addAssistantMsg("❌ Payment failed ho gaya. Dobara try karein?", { bookingStep: "payment_method" });
-          setBookingStep("payment_method");
-        } else {
-          addAssistantMsg("Payment abhi complete nahi hua. Dobara try karein.", { bookingStep: "online_payment", paymentLink: data.payment_link });
+        } catch {
+          addAssistantMsg(
+            "Payment verify karne mein error aaya. Dobara try karein.",
+          );
+          setPaymentSession({
+            payment_link: data.payment_link,
+            order_id: data.order_id,
+          });
           setBookingStep("online_payment");
         }
       } else {
-        addAssistantMsg(data.error || "Payment session banana mein error aaya.");
+        addAssistantMsg(
+          data.error || "Payment session banana mein error aaya.",
+        );
         setBookingStep("payment_method");
       }
     } catch {
-      addAssistantMsg("Payment session banana mein error aaya. Dobara try karein.");
+      addAssistantMsg(
+        "Payment session banana mein error aaya. Dobara try karein.",
+      );
       setBookingStep("payment_method");
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
-
+  
   const handlePaymentDone = async () => {
     setBookingStep(null); setLoading(true);
     try {
