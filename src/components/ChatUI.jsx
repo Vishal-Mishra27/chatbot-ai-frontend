@@ -224,8 +224,9 @@ export default function ChatUI() {
     if (isSearchIntent(trimmed)) { await handleSearch(trimmed); return; }
     setLoading(true);
     try {
-      const res = await fetch(`${BASE_URL}/chat`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+      const res = await fetch(`${BASE_URL2}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: trimmed, userId, token: "" }),
       });
       const data = await res.json();
