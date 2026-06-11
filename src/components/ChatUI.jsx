@@ -9,6 +9,13 @@ const BASE_URL = "https://root.roombookkro.com/api";
 export default function ChatUI() {
   const [userId, setUserId] = useState("");
   const [userIdInput, setUserIdInput] = useState("");
+
+  // Read userId from URL params (?userId=15)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paramUserId = params.get("userId");
+    if (paramUserId) setUserId(paramUserId);
+  }, []);
   const [messages, setMessages] = useState([
     { role: "assistant", content: "Hi! I'm your AI assistant. How can I help you?" },
   ]);
@@ -17,14 +24,16 @@ export default function ChatUI() {
   const [location, setLocation] = useState(null);
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [bookingState, setBookingState] = useState(null);
-  const [bookingStep, setBookingStep] = useState(null); // null | 'form' | 'payment_method' | 'online_payment' | 'done'
+  const [bookingStep, setBookingStep] = useState(null);
   const [paymentSession, setPaymentSession] = useState(null);
   const bottomRef = useRef(null);
 
   useEffect(() => {
-    navigator.geolocation?.getCurrentPosition(
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
       (pos) => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setLocation({ lat: null, lng: null })
+      () => setLocation({ lat: null, lng: null }),
+      { timeout: 10000, enableHighAccuracy: false, maximumAge: 60000 }
     );
   }, []);
 
@@ -49,12 +58,21 @@ export default function ChatUI() {
   };
 
   const fetchLocation = () =>
-    new Promise((resolve) =>
-      navigator.geolocation?.getCurrentPosition(
-        (pos) => { const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }; setLocation(loc); resolve(loc); },
-        () => resolve(null)
-      )
-    );
+    new Promise((resolve) => {
+      if (!navigator.geolocation) { resolve(null); return; }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setLocation(loc);
+          resolve(loc);
+        },
+        (err) => {
+          console.warn("Geolocation error:", err.code, err.message);
+          resolve(null);
+        },
+        { timeout: 10000, enableHighAccuracy: false, maximumAge: 60000 }
+      );
+    });
 
   const handleSearch = async (keyword, locOverride = null) => {
     const loc = locOverride || location;
@@ -66,7 +84,6 @@ export default function ChatUI() {
     try {
       const params = new URLSearchParams({ lat: loc.lat, lng: loc.lng, userId, keyword });
       const res = await fetch(`${BASE_URL}/search?${params}`);
-      console.log("res hostel:",res)
       const data = await res.json();
       setMessages((prev) => [...prev, { role: "assistant", content: "Yeh hotels mile aapke aas paas:", hotels: data.data }]);
     } catch {
@@ -78,26 +95,31 @@ export default function ChatUI() {
 
   const handleGetLocation = async (pendingKeyword) => {
     setMessages((prev) => prev.map((m) => m.locationBtn ? { ...m, locationBtn: false } : m));
+    addAssistantMsg("📍 Location fetch ho rahi hai...");
     const loc = await fetchLocation();
-    if (loc) await handleSearch(pendingKeyword, loc);
-    else addAssistantMsg("Location access nahi mila. Browser settings mein location allow karein.");
+    if (loc?.lat && loc?.lng) {
+      await handleSearch(pendingKeyword, loc);
+    } else {
+      addAssistantMsg(
+        "Location access nahi mila. App/browser settings mein location permission allow karein aur dobara try karein.",
+        { locationBtn: true, pendingKeyword }
+      );
+    }
   };
 
-  // Room select → show booking form
   const handleRoomSelect = (hotel, room) => {
     setSelectedRoom({ hotel, room });
     setBookingState({ userId, token: "", residencyId: hotel.residencyId, roomId: room.roomId, pricePerNight: room.price, hotelName: hotel.name, roomType: room.roomType });
     setBookingStep("form");
   };
 
-  // Form submitted → go to payment method
   const handleFormSubmit = (formData) => {
     const updatedState = { ...bookingState, ...formData };
     setBookingState(updatedState);
     setBookingStep("payment_method");
     addAssistantMsg(
-      `\u2705 Details mil gayi!\n\ud83c\udfe8 ${updatedState.hotelName} \u2014 ${updatedState.roomType}\n\ud83d\udcc5 Check-in: ${formData.checkInDate.split("T")[0]}\n\ud83d\udcc5 Check-out: ${formData.checkOutDate.split("T")[0]}\n\ud83d\udc64 Guest: ${formData.bookingFor}\n\ud83d\udecc Rooms: ${formData.nor} | Guests: ${formData.nog}\n\ud83c\udfe8 ${formData.numberOfNights} night(s) \u00d7 \u20b9${formData.price} = \u20b9${formData.finalAmount}\n\nPayment method chunein:`,
-      { bookingStep: "payment_method" },
+      `\u2705 Details mil gayi!\n\ud83c\udfe8 ${updatedState.hotelName} \u2014 ${updatedState.roomType}\n\ud83d\udcc5 Check-in: ${formData.checkInDate.split("T")[0]}\n\ud83d\udcc5 Check-out: ${formData.checkOutDate.split("T")[0]}\n\ud83d\udc64 Guest: ${formData.bookingFor}\n\ud83d\udecc Rooms: ${formData.nor} | Guests: ${formData.nog}\n\ud83c\udfe8 ${formData.numberOfNights} night(s) \u00d7 \u20b9${bookingState.pricePerNight} = \u20b9${formData.finalAmount}\n\nPayment method chunein:`,
+      { bookingStep: "payment_method" }
     );
   };
 
@@ -160,20 +182,13 @@ export default function ChatUI() {
         const paymentStatus = result?.paymentDetails?.paymentStatus;
 
         if (paymentStatus === "SUCCESS") {
-          // Auto verify and place order
           setLoading(true);
           setBookingStep(null);
-          const verifyRes = await fetch(
-            `https://chatbot-ai-backend-t7xb.onrender.com/booking/verify-and-place`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                bookingState,
-                cashfreeOrderId: data.order_id,
-              }),
-            },
-          );
+          const verifyRes = await fetch(`${BASE_URL2}/booking/verify-and-place`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ bookingState, cashfreeOrderId: data.order_id }),
+          });
           const verifyData = await verifyRes.json();
           if (verifyData.status === "PAID" && verifyData.success) {
             setBookingStep("done");
@@ -189,7 +204,6 @@ export default function ChatUI() {
           addAssistantMsg("\u274c Payment failed ho gaya. Dobara try karein?", { bookingStep: "payment_method" });
           setBookingStep("payment_method");
         } else {
-          // PENDING or modal closed
           addAssistantMsg("Payment abhi complete nahi hua. Payment karne ke baad dobara try karein.", { bookingStep: "online_payment", paymentLink: data.payment_link });
           setBookingStep("online_payment");
         }
@@ -205,50 +219,39 @@ export default function ChatUI() {
     }
   };
 
- const handlePaymentDone = async () => {
-   setBookingStep(null);
-   setLoading(true);
-   console.log("Verifying payment for order_id:", paymentSession?.order_id);
-   try {
-     const res = await fetch(
-       `https://chatbot-ai-backend-t7xb.onrender.com/booking/verify-and-place`,
-       {
-         method: "POST",
-         headers: { "Content-Type": "application/json" },
-         body: JSON.stringify({
-           bookingState,
-           cashfreeOrderId: paymentSession.order_id,
-         }),
-       },
-     );
-     const data = await res.json();
-
-     if (data.status === "PAID" && data.success) {
-       setBookingStep("done");
-       addAssistantMsg(
-         `✅ Booking Confirmed!\n🏨 Hotel: ${bookingState.hotelName}\n🛏️ Room: ${bookingState.roomType}\n👤 Guest: ${bookingState.bookingFor}\n📅 Check-in: ${bookingState.checkInDate.split("T")[0]}\n📅 Check-out: ${bookingState.checkOutDate.split("T")[0]}\n💰 Amount: ₹${bookingState.finalAmount}\n💳 Payment: Online Paid\n🔖 Order ID: ${data.orderId}`,
-       );
-       setBookingState(null);
-       setSelectedRoom(null);
-       setPaymentSession(null);
-     } else if (data.status === "EXPIRED") {
-       addAssistantMsg(data.message);
-       await handleOnlinePayment(); // naya session banao
-     } else if (data.status === "FAILED") {
-       addAssistantMsg(data.message);
-       setBookingStep("payment_method");
-     } else {
-       // PENDING ya kuch aur
-       addAssistantMsg(data.message || "Payment abhi complete nahi hua.");
-       setBookingStep("online_payment");
-     }
-   } catch {
-     addAssistantMsg("Payment verify karne mein error aaya.");
-     setBookingStep("online_payment");
-   } finally {
-     setLoading(false);
-   }
- };
+  const handlePaymentDone = async () => {
+    setBookingStep(null);
+    setLoading(true);
+    try {
+      const res = await fetch(`${BASE_URL2}/booking/verify-and-place`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingState, cashfreeOrderId: paymentSession.order_id }),
+      });
+      const data = await res.json();
+      if (data.status === "PAID" && data.success) {
+        setBookingStep("done");
+        addAssistantMsg(`\u2705 Booking Confirmed!\n\ud83c\udfe8 Hotel: ${bookingState.hotelName}\n\ud83d\udecf\ufe0f Room: ${bookingState.roomType}\n\ud83d\udc64 Guest: ${bookingState.bookingFor}\n\ud83d\udcc5 Check-in: ${bookingState.checkInDate.split("T")[0]}\n\ud83d\udcc5 Check-out: ${bookingState.checkOutDate.split("T")[0]}\n\ud83d\udcb0 Amount: \u20b9${bookingState.finalAmount}\n\ud83d\udcb3 Payment: Online Paid\n\ud83d\udd16 Order ID: ${data.orderId}`);
+        setBookingState(null);
+        setSelectedRoom(null);
+        setPaymentSession(null);
+      } else if (data.status === "EXPIRED") {
+        addAssistantMsg(data.message);
+        await handleOnlinePayment();
+      } else if (data.status === "FAILED") {
+        addAssistantMsg(data.message);
+        setBookingStep("payment_method");
+      } else {
+        addAssistantMsg(data.message || "Payment abhi complete nahi hua.");
+        setBookingStep("online_payment");
+      }
+    } catch {
+      addAssistantMsg("Payment verify karne mein error aaya.");
+      setBookingStep("online_payment");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleCancelPayment = () => {
     setBookingStep(null);
@@ -333,7 +336,6 @@ export default function ChatUI() {
           </div>
         ))}
 
-        {/* Booking form shown inline in chat */}
         {bookingStep === "form" && selectedRoom && (
           <div className="message assistant">
             <BookingForm
