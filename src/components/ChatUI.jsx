@@ -4,6 +4,7 @@ import BookingFlow from "./BookingFlow";
 import BookingForm from "./BookingForm";
 
 const BASE_URL2 = "https://chatbot-ai-backend-t7xb.onrender.com";
+// const BASE_URL2 = "http://localhost:5000";
 const BASE_URL = "https://root.roombookkro.com/api";
 
 export default function ChatUI() {
@@ -96,10 +97,36 @@ export default function ChatUI() {
     }
   };
 
-  const handleRoomSelect = (hotel, room) => {
-    setSelectedRoom({ hotel, room });
-    setBookingState({ userId, token: "", residencyId: hotel.residencyId, roomId: room.roomId, pricePerNight: room.price, hotelName: hotel.name, roomType: room.roomType });
-    setBookingStep("form");
+  // const handleRoomSelect = (hotel, room) => {
+  //   setSelectedRoom({ hotel, room });
+  //   setBookingState({ userId, token: "", residencyId: hotel.residencyId, roomId: room.roomId, pricePerNight: room.price, hotelName: hotel.name, roomType: room.roomType });
+  //   setBookingStep("form");
+  // };
+
+  const handleRoomSelect = (hotel, room, autoBookMeta = null) => {
+    if (autoBookMeta?.checkIn && autoBookMeta?.checkOut) {
+      // Auto flow — form skip, direct payment
+      autoFillAndBook(
+        hotel,
+        room,
+        autoBookMeta.checkIn,
+        autoBookMeta.checkOut,
+        autoBookMeta.guestName,
+      );
+    } else {
+      // Normal flow
+      setSelectedRoom({ hotel, room });
+      setBookingState({
+        userId,
+        token: "",
+        residencyId: hotel.residencyId,
+        roomId: room.roomId,
+        pricePerNight: room.price || room.pricePerNight,
+        hotelName: hotel.name,
+        roomType: room.roomType,
+      });
+      setBookingStep("form");
+    }
   };
 
   const handleFormSubmit = (formData) => {
@@ -354,10 +381,129 @@ export default function ChatUI() {
         body: JSON.stringify({ message: trimmed, userId, token: "" }),
       });
       const data = await res.json();
+          if (data.intent === "book_hotel") {
+            setLoading(false);
+            await handleAutoBooking(data);
+            return;
+          }
       setMessages((prev) => [...prev, { role: "assistant", content: data.reply || data.error }]);
     } catch {
       setMessages((prev) => [...prev, { role: "assistant", content: "Error: Could not reach server." }]);
     } finally { setLoading(false); }
+  };
+
+  const handleAutoBooking = async ({
+    hotelName,
+    checkIn,
+    checkOut,
+    guestName,
+  }) => {
+    addAssistantMsg(`🔍 "${hotelName}" dhoondh raha hoon...`);
+
+    const loc = location || (await fetchLocation());
+    if (!loc?.lat || !loc?.lng) {
+      addAssistantMsg("📍 Location access chahiye.", {
+        locationBtn: true,
+        pendingKeyword: hotelName,
+      });
+      return;
+    }
+
+    setLoading(true);
+    let hotels = [];
+    try {
+      const params = new URLSearchParams({
+        lat: loc.lat,
+        lng: loc.lng,
+        userId,
+        keyword: hotelName,
+      });
+      const res = await fetch(`${BASE_URL}/search?${params}`);
+      const data = await res.json();
+      hotels = data.data || [];
+    } catch {
+      addAssistantMsg("Hotel search mein error aaya.");
+      setLoading(false);
+      return;
+    } finally {
+      setLoading(false);
+    }
+
+    if (hotels.length === 0) {
+      addAssistantMsg(`❌ "${hotelName}" naam ka koi hotel nahi mila.`);
+      return;
+    }
+
+    // Fuzzy match
+    const normalize = (s) => s?.toLowerCase().replace(/\s+/g, " ").trim();
+    const matched = hotels.filter(
+      (h) =>
+        normalize(h.name).includes(normalize(hotelName)) ||
+        normalize(hotelName).includes(normalize(h.name)),
+    );
+
+    const candidates = matched.length > 0 ? matched : hotels;
+
+    if (candidates.length === 1) {
+      // ✅ Single match — direct book
+      const hotel = candidates[0];
+      const room = hotel.rooms?.find((r) => r.isAvailable) || hotel.rooms?.[0];
+      if (!room) {
+        addAssistantMsg(`"${hotel.name}" mein koi room available nahi.`);
+        return;
+      }
+      autoFillAndBook(hotel, room, checkIn, checkOut, guestName);
+    } else {
+      // ⚠️ Multiple — cards dikhao, dates save karo
+      addAssistantMsg(
+        matched.length > 1
+          ? `"${hotelName}" naam se kuch hotels mile. Kaunsa book karein?`
+          : `"${hotelName}" exact match nahi mila. Yeh similar hotels hain:`,
+        { hotels: candidates, autoBookMeta: { checkIn, checkOut, guestName } },
+      );
+    }
+  };
+
+  const autoFillAndBook = (hotel, room, checkIn, checkOut, guestName) => {
+    const price = room.price || room.pricePerNight || 0;
+    const nights =
+      checkIn && checkOut
+        ? Math.max(
+            0,
+            Math.round((new Date(checkOut) - new Date(checkIn)) / 86400000),
+          )
+        : 0;
+    const finalAmount = price * nights;
+
+    const state = {
+      userId,
+      token: "",
+      residencyId: hotel.residencyId,
+      roomId: room.roomId,
+      pricePerNight: price,
+      hotelName: hotel.name,
+      roomType: room.roomType,
+      checkInDate: new Date(checkIn + "T14:00:00").toISOString(),
+      checkOutDate: new Date(checkOut + "T11:00:00").toISOString(),
+      bookingFor: guestName,
+      nog: 1,
+      nor: 1,
+      isChildren: false,
+      childrenNumber: 0,
+      description: "",
+      cupponCode: "",
+      totalAmount: finalAmount,
+      finalAmount,
+      discount: 0,
+      numberOfNights: nights,
+    };
+
+    setBookingState(state);
+    setBookingStep("payment_method");
+    addAssistantMsg(
+      `✅ Booking details ready!\n🏨 ${hotel.name} — ${room.roomType}\n📅 Check-in: ${checkIn}\n📅 Check-out: ${checkOut}\n👤 Guest: ${guestName || "—"}\n🌙 ${nights} night(s) × ₹${price} = ₹${finalAmount}\n\nPayment method chunein:`,
+      { bookingStep: "payment_method" },
+    );
   };
 
   const handleKey = (e) => {
@@ -396,33 +542,60 @@ export default function ChatUI() {
   return (
     <div className="bg-gray-50 flex items-start justify-center fixed inset-0">
       <div className="w-full max-w-md h-[96%] sm:h-[680px] sm:rounded-3xl sm:shadow-2xl bg-white flex flex-col overflow-hidden border border-gray-100 sm:relative">
-
         {/* Header */}
         <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 px-5 py-4 flex items-center gap-3 shrink-0">
-          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center text-xl">🏨</div>
-          <div className="flex-1">
-            <div className="text-white font-bold text-sm">Hotel Booking Assistant</div>
-            <div className="text-emerald-100 text-xs">Online · Ready to help</div>
+          <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center text-xl">
+            🏨
           </div>
-          <div className="bg-white/20 text-white text-xs font-medium px-3 py-1 rounded-full">ID: {userId}</div>
+          <div className="flex-1">
+            <div className="text-white font-bold text-sm">
+              Hotel Booking Assistant
+            </div>
+            <div className="text-emerald-100 text-xs">
+              Online · Ready to help
+            </div>
+          </div>
+          <div className="bg-white/20 text-white text-xs font-medium px-3 py-1 rounded-full">
+            ID: {userId}
+          </div>
         </div>
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3 bg-gray-50">
           {messages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div
+              key={i}
+              className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+            >
               {msg.role === "assistant" && (
-                <div className="w-7 h-7 bg-emerald-500 rounded-xl flex items-center justify-center text-sm mr-2 mt-0.5 shrink-0">🏨</div>
+                <div className="w-7 h-7 bg-emerald-500 rounded-xl flex items-center justify-center text-sm mr-2 mt-0.5 shrink-0">
+                  🏨
+                </div>
               )}
-              <div className={`max-w-[80%] ${msg.role === "user"
-                ? "bg-emerald-500 text-white rounded-2xl rounded-tr-sm px-4 py-2.5"
-                : "bg-white text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm border border-gray-100"
-              }`}>
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                {msg.hotels && <HotelCards hotels={msg.hotels} onSelectRoom={handleRoomSelect} />}
+              <div
+                className={`max-w-[80%] ${
+                  msg.role === "user"
+                    ? "bg-emerald-500 text-white rounded-2xl rounded-tr-sm px-4 py-2.5"
+                    : "bg-white text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm border border-gray-100"
+                }`}
+              >
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                  {msg.content}
+                </p>
+                {/* {msg.hotels && <HotelCards hotels={msg.hotels} onSelectRoom={handleRoomSelect} />} */}
+                {msg.hotels && (
+                  <HotelCards
+                    hotels={msg.hotels}
+                    onSelectRoom={(hotel, room) =>
+                      handleRoomSelect(hotel, room, msg.autoBookMeta || null)
+                    }
+                  />
+                )}
                 {msg.locationBtn && (
-                  <button onClick={() => handleGetLocation(msg.pendingKeyword)}
-                    className="mt-2 flex items-center gap-2 bg-amber-400 hover:bg-amber-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors">
+                  <button
+                    onClick={() => handleGetLocation(msg.pendingKeyword)}
+                    className="mt-2 flex items-center gap-2 bg-amber-400 hover:bg-amber-500 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors"
+                  >
                     📍 Get My Location
                   </button>
                 )}
@@ -430,10 +603,18 @@ export default function ChatUI() {
                   <BookingFlow
                     step={msg.bookingStep}
                     paymentLink={msg.paymentLink}
-                    onPayAtHotel={i === messages.length - 1 ? handlePayAtHotel : null}
-                    onOnlinePayment={i === messages.length - 1 ? handleOnlinePayment : null}
-                    onPaymentDone={i === messages.length - 1 ? handlePaymentDone : null}
-                    onCancel={i === messages.length - 1 ? handleCancelPayment : null}
+                    onPayAtHotel={
+                      i === messages.length - 1 ? handlePayAtHotel : null
+                    }
+                    onOnlinePayment={
+                      i === messages.length - 1 ? handleOnlinePayment : null
+                    }
+                    onPaymentDone={
+                      i === messages.length - 1 ? handlePaymentDone : null
+                    }
+                    onCancel={
+                      i === messages.length - 1 ? handleCancelPayment : null
+                    }
                   />
                 )}
               </div>
@@ -443,9 +624,16 @@ export default function ChatUI() {
           {/* Booking Form */}
           {bookingStep === "form" && selectedRoom && (
             <div className="flex justify-start">
-              <div className="w-7 h-7 bg-emerald-500 rounded-xl flex items-center justify-center text-sm mr-2 mt-0.5 shrink-0">🏨</div>
+              <div className="w-7 h-7 bg-emerald-500 rounded-xl flex items-center justify-center text-sm mr-2 mt-0.5 shrink-0">
+                🏨
+              </div>
               <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-gray-100 w-full max-w-[85%]">
-                <BookingForm hotel={selectedRoom.hotel} room={selectedRoom.room} onSubmit={handleFormSubmit} onCancel={handleFormCancel} />
+                <BookingForm
+                  hotel={selectedRoom.hotel}
+                  room={selectedRoom.room}
+                  onSubmit={handleFormSubmit}
+                  onCancel={handleFormCancel}
+                />
               </div>
             </div>
           )}
@@ -453,7 +641,9 @@ export default function ChatUI() {
           {/* Typing Indicator */}
           {loading && (
             <div className="flex justify-start">
-              <div className="w-7 h-7 bg-emerald-500 rounded-xl flex items-center justify-center text-sm mr-2 shrink-0">🏨</div>
+              <div className="w-7 h-7 bg-emerald-500 rounded-xl flex items-center justify-center text-sm mr-2 shrink-0">
+                🏨
+              </div>
               <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-gray-100">
                 <div className="flex gap-1 items-center h-4">
                   <span className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce [animation-delay:0ms]"></span>
@@ -470,12 +660,15 @@ export default function ChatUI() {
         <div className="px-4 py-3 bg-white border-t border-gray-100 shrink-0">
           {bookingStep && bookingStep !== "done" && bookingStep !== "form" ? (
             <div className="text-center text-xs text-gray-400 py-2">
-              {bookingStep === "payment_method" ? "⬆️ Payment method chunein" : "⬆️ Upar se action karein"}
+              {bookingStep === "payment_method"
+                ? "⬆️ Payment method chunein"
+                : "⬆️ Upar se action karein"}
             </div>
           ) : (
             <div className="flex gap-2 items-end">
               <textarea
-                rows={1} value={input}
+                rows={1}
+                value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKey}
                 placeholder="Message likhein..."
@@ -487,7 +680,12 @@ export default function ChatUI() {
                 disabled={loading || !!bookingStep}
                 className="w-10 h-10 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white rounded-xl flex items-center justify-center transition-colors shrink-0"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 rotate-0">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="w-4 h-4 rotate-0"
+                >
                   <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
                 </svg>
               </button>
